@@ -1,0 +1,31 @@
+<header class="topbar">
+  <div class="seg">
+    @for (m of modes; track m.id) {
+      <button [class.on]="data.mode() === m.id" (click)="data.mode.set(m.id)">{{ m.label }}</button>
+    }
+  </div>
+
+  <div class="inputs">
+    @switch (data.mode()) {
+      @case ('daily') { <input type="date" [value]="data.day()" min="2024-08-01" max="2024-10-29" (change)="data.day.set(val($event))"> }
+      @case ('weekly') { <input type="week" [value]="data.week()" min="2024-W31" max="2024-W44" (change)="data.week.set(val($event))"> }
+      @case ('monthly') { <input type="month" [value]="data.month()" min="2024-08" max="2024-10" (change)="data.month.set(val($event))"> }
+      @case ('custom') {
+        <input type="date" [value]="data.from()" min="2024-08-01" max="2024-10-29" (change)="data.from.set(val($event))">
+        <span>to</span>
+        <input type="date" [value]="data.to()" min="2024-08-01" max="2024-10-29" (change)="data.to.set(val($event))">
+      }
+    }
+  </div>
+
+  <div class="dl">
+    <button class="btn" (click)="toggle($event)">⬇ Download Report</button>
+    @if (menuOpen()) {
+      <div class="menu">
+        <button (click)="download('xlsx')">Excel (.xlsx)</button>
+        <button (click)="download('pdf')">PDF (.pdf)</button>
+        <button (click)="download('csv')">CSV (.csv)</button>
+      </div>
+    }
+  </div>
+</header>

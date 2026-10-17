@@ -1,0 +1,180 @@
+<div class="page-head">
+  <h1>{{ title() }}</h1>
+  <p class="per">{{ period() }} · compared with previous {{ data.periodLabel() }} · grouped by {{ groupName().toLowerCase() }}</p>
+</div>
+
+<!-- KPI strip -->
+<div class="kpis">
+  @for (k of kpis(); track k.l) {
+    <div class="kpi"><span>{{ k.l }}</span><b>{{ k.v | number }}</b><i [class]="k.d.c">{{ k.d.t }}</i> <small>vs prev. {{ data.periodLabel() }}</small></div>
+  }
+</div>
+
+<div class="grid">
+
+  <!-- 1. Guest Services Availed -->
+  <section class="card wide">
+    <h2><em>1</em>Guest Services Availed</h2>
+    <div class="mini">
+      <div><b>{{ s().tot | number }}</b><span>Total requests</span></div>
+      <div><b>{{ s().guests | number }}</b><span>Unique guests</span> <i [class]="delta(s().guests, p().guests).c">{{ delta(s().guests, p().guests).t }}</i></div>
+      <div><b>{{ s().guests ? (s().tot / s().guests | number:'1.0-1') : 0 }}</b><span>Requests / guest</span></div>
+      <div><b>{{ p().tot | number }}</b><span>Previous {{ data.periodLabel() }}</span></div>
+    </div>
+    <div class="two">
+      <div><h3>Unique guests by {{ groupName().toLowerCase() }}</h3><app-chart type="pie" [labels]="labels()" [datasets]="c1()" /></div>
+      <div><h3>Requests by {{ groupName().toLowerCase() }}</h3><div class="tw"><table>
+        <tr><th>{{ groupName() }}</th><th>Requests</th><th>Unique guests</th><th>Share</th><th>Previous</th><th>Change</th></tr>
+        @for (r of s().rows; track r.label; let i = $index) {
+          <tr><td><i class="dot" [style.background]="r.color"></i>{{ r.label }}</td><td>{{ r.tot }}</td><td>{{ r.guests }}</td><td>{{ share(r.tot) | number:'1.0-1' }}%</td>
+            <td>{{ p().rows[i].tot }}</td><td><i [class]="delta(r.tot, p().rows[i].tot).c">{{ delta(r.tot, p().rows[i].tot).t }}</i></td></tr>
+        }
+      </table></div></div>
+    </div>
+    <h3>Guest details – guest name, room no. and staff name ({{ groupName().toLowerCase() }}-wise, latest 2 each)</h3>
+    <div class="tw"><table>
+      <tr><th>{{ groupName() }}</th><th>Guest name</th><th>Room no.</th><th>Staff name</th><th>{{ dept() === null ? 'Service' : 'Date' }}</th><th>Status</th></tr>
+      @for (g of guestRows(); track g.o.id) {
+        <tr><td><i class="dot" [style.background]="g.color"></i>{{ g.group }}</td><td><b>{{ g.o.guest }}</b></td><td>{{ g.o.room }}</td><td>{{ g.o.staff }}</td>
+          <td>{{ dept() === null ? svcName(g.o) : dateOf(g.o.date) }}</td><td><span [class]="'chip ' + statusCls(g.o.status)">{{ g.o.status }}</span></td></tr>
+      } @empty { <tr><td colspan="6" class="empty">No guest requests in this period</td></tr> }
+    </table></div>
+  </section>
+
+  <!-- 2. Service-wise Delivery -->
+  <section class="card wide">
+    <h2><em>2</em>Service-wise Delivery</h2>
+    <div class="two">
+      <div><h3>Delivery % by {{ groupName().toLowerCase() }}</h3><app-chart type="bar" [labels]="labels()" [datasets]="c2()" [options]="c2opt" /></div>
+      <div><h3>Performance table</h3><div class="tw"><table>
+        <tr><th>{{ groupName() }}</th><th>Total</th><th>Delivered</th><th>Pending</th><th>Avg time</th><th>Delivery %</th></tr>
+        @for (r of s().rows; track r.label) {
+          <tr><td>{{ r.label }}</td><td>{{ r.tot }}</td><td>{{ r.del }}</td><td>{{ r.pen }}</td><td>{{ r.avgT | number:'1.0-1' }} min</td>
+            <td><span [class]="'chip ' + pctClass(r.pct)">{{ r.pct | number:'1.0-1' }}%</span></td></tr>
+        }
+      </table></div></div>
+    </div>
+  </section>
+
+  <!-- 3. Order Escalation -->
+  <section class="card wide">
+    <h2><em>3</em>Order Escalation</h2>
+    <div class="mini">
+      <div><b>{{ s().esc.length }}</b><span>Total escalated</span></div>
+      <div class="hi"><b>{{ highCount() }}</b><span>🔴 High priority</span></div>
+      <div><b>{{ prio('Medium') }}</b><span>Medium</span></div>
+      <div><b>{{ prio('Low') }}</b><span>Low</span></div>
+      <div><b>{{ openEsc() }}</b><span>Still open</span></div>
+    </div>
+
+    <div class="two">
+      <div><h3>Escalation level</h3><app-chart type="doughnut" [labels]="levelLabels" [datasets]="pie()" /></div>
+      <div><h3>By {{ groupName().toLowerCase() }} and priority</h3><app-chart type="bar" [labels]="labels()" [datasets]="c3()" [options]="c3opt" /></div>
+    </div>
+
+    <div class="two">
+      <div><h3>Escalations by staff</h3><div class="tw"><table>
+        <tr><th>Staff name</th><th>Department</th><th>Escalations</th><th>High priority</th></tr>
+        @for (b of topStaff(); track b.name) {
+          <tr [class.hot]="b.high > 0"><td><b>{{ b.name }}</b></td><td>{{ b.dept }}</td><td>{{ b.count }}</td><td>{{ b.high }}</td></tr>
+        } @empty { <tr><td colspan="4" class="empty">No escalations in this period</td></tr> }
+      </table></div></div>
+      <div><h3>Staff hierarchy – orders escalated up to each level</h3>
+        <div class="hier">
+          <div class="lv0"><b>Staff</b><span>Handles the order</span></div><u>→</u>
+          <div class="lv1"><b>{{ s().levels[0] }}</b><span>Supervisor</span></div><u>→</u>
+          <div class="lv2"><b>{{ s().levels[1] }}</b><span>Manager</span></div><u>→</u>
+          <div class="lv3"><b>{{ s().levels[2] }}</b><span>General Manager</span></div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Recent escalations</h3>
+    <div class="tw"><table>
+      <tr><th>Order</th><th>Guest</th><th>Room</th><th>{{ groupName() }}</th><th>Handled by (staff)</th><th>Escalation path</th><th>Reason</th><th>Priority</th><th>Status</th></tr>
+      @for (o of topEsc(); track o.id) {
+        <tr [class.hot]="o.priority === 'High'"><td>{{ o.id }}</td><td>{{ o.guest }}</td><td>{{ o.room }}</td><td>{{ dept() === null ? deptName(o) : svcName(o) }}</td>
+          <td><b>{{ o.staff }}</b></td>
+          <td class="path">@for (c of chain(o); track $index; let last = $last) { <span>{{ c.name }} <small>({{ c.role }})</small></span>@if (!last) { <u>→</u> } }</td>
+          <td>{{ o.escReason }}</td>
+          <td><span [class]="'chip ' + o.priority">{{ o.priority }}</span></td><td><span [class]="'chip ' + cls(o.escStatus!)">{{ o.escStatus }}</span></td></tr>
+      } @empty { <tr><td colspan="9" class="empty">No escalations in this period</td></tr> }
+    </table></div>
+  </section>
+
+  <!-- 4. Order Delay -->
+  <section class="card wide">
+    <h2><em>4</em>Order Delay</h2>
+    <div class="mini">
+      <div><b>{{ s().late.length }}</b><span>Delayed orders</span></div>
+      <div><b>{{ s().avgDelay | number:'1.0-1' }}</b><span>Avg delay (min)</span></div>
+      <div><b>{{ s().del.length ? (s().late.length / s().del.length * 100 | number:'1.0-1') : 0 }}%</b><span>Of delivered orders</span></div>
+    </div>
+    <div class="two">
+      <div><h3>Delayed orders by {{ groupName().toLowerCase() }}</h3><app-chart type="bar" [labels]="labels()" [datasets]="c4()" [options]="c4opt" /></div>
+      <div><h3>Delay summary</h3><div class="tw"><table>
+        <tr><th>{{ groupName() }}</th><th>Delivered</th><th>Delayed</th><th>% delayed</th></tr>
+        @for (r of s().rows; track r.label) {
+          <tr><td>{{ r.label }}</td><td>{{ r.del }}</td><td>{{ r.late }}</td><td>{{ r.del ? (r.late / r.del * 100 | number:'1.0-1') : 0 }}%</td></tr>
+        }
+      </table></div></div>
+    </div>
+    <h3>Delayed orders – expected vs actual time</h3>
+    <div class="tw"><table>
+      <tr><th>Order</th><th>Guest</th><th>Room</th><th>Staff</th><th>{{ groupName() }}</th><th>Expected</th><th>Actual</th><th>Delay</th><th>Status</th></tr>
+      @for (o of topLate(); track o.id) {
+        <tr [class.hot]="o.actual! - o.expected >= 20"><td>{{ o.id }}</td><td>{{ o.guest }}</td><td>{{ o.room }}</td><td>{{ o.staff }}</td><td>{{ dept() === null ? deptName(o) : svcName(o) }}</td><td>{{ o.expected }} min</td><td>{{ o.actual }} min</td>
+          <td><b>+{{ o.actual! - o.expected }} min</b></td><td><span [class]="'chip ' + (o.actual! - o.expected >= 20 ? 'Open' : 'InProgress')">{{ o.actual! - o.expected >= 20 ? 'Delayed' : 'Minor' }}</span></td></tr>
+      } @empty { <tr><td colspan="9" class="empty">No delayed orders in this period</td></tr> }
+    </table></div>
+  </section>
+
+  <!-- 5. Order Delivery -->
+  <section class="card wide">
+    <h2><em>5</em>Order Delivery</h2>
+    <div class="mini">
+      <div><b>{{ s().del.length }}</b><span>Delivered</span></div>
+      <div><b>{{ s().onTime }}</b><span>On time</span></div>
+      <div><b>{{ s().late.length }}</b><span>Delivered late</span></div>
+      <div><b>{{ s().avgTime | number:'1.0-1' }}</b><span>Avg delivery (min)</span></div>
+      <div class="ok"><b>{{ s().successRate | number:'1.0-1' }}%</b><span>Success rate</span></div>
+    </div>
+    <div class="two">
+      <div><h3>Order outcome</h3><app-chart type="bar" [labels]="['On time', 'Late', 'Pending', 'Cancelled']" [datasets]="c5()" [options]="hBarOpt" /></div>
+      <div><h3>Delivery by {{ groupName().toLowerCase() }}</h3><div class="tw"><table>
+        <tr><th>{{ groupName() }}</th><th>Delivered</th><th>On time</th><th>Late</th><th>Avg time</th><th>Success</th></tr>
+        @for (r of s().rows; track r.label) {
+          <tr><td>{{ r.label }}</td><td>{{ r.del }}</td><td>{{ r.del - r.late }}</td><td>{{ r.late }}</td><td>{{ r.avgT | number:'1.0-1' }} min</td>
+            <td><span [class]="'chip ' + pctClass(r.del ? (r.del - r.late) / r.del * 100 : 0)">{{ r.del ? ((r.del - r.late) / r.del * 100 | number:'1.0-1') : 0 }}%</span></td></tr>
+        }
+      </table></div></div>
+    </div>
+  </section>
+
+  <!-- 6. Order Cancellation -->
+  <section class="card wide">
+    <h2><em>6</em>Order Cancellation</h2>
+    <div class="mini">
+      <div><b>{{ s().can.length }}</b><span>Cancelled</span></div>
+      <div><b>{{ s().cancelRate | number:'1.0-1' }}%</b><span>Cancellation rate</span></div>
+      <div><b>{{ p().cancelRate | number:'1.0-1' }}%</b><span>Previous rate</span></div>
+    </div>
+    <div class="two">
+      <div><h3>Cancellation reasons</h3><app-chart type="bar" [labels]="cancelReasons" [datasets]="c6()" [options]="hBarOpt" /></div>
+      <div><h3>{{ groupName() }}-wise cancellations</h3><div class="tw"><table>
+        <tr><th>{{ groupName() }}</th><th>Total</th><th>Cancelled</th><th>Rate</th></tr>
+        @for (r of s().rows; track r.label) {
+          <tr><td>{{ r.label }}</td><td>{{ r.tot }}</td><td>{{ r.can }}</td><td>{{ r.tot ? (r.can / r.tot * 100 | number:'1.0-1') : 0 }}%</td></tr>
+        }
+      </table></div></div>
+    </div>
+    <h3>Recent cancellations</h3>
+    <div class="tw"><table>
+      <tr><th>Order</th><th>Guest</th><th>Room</th><th>Staff</th><th>{{ groupName() }}</th><th>Reason</th></tr>
+      @for (o of recentCan(); track o.id) {
+        <tr><td>{{ o.id }}</td><td>{{ o.guest }}</td><td>{{ o.room }}</td><td>{{ o.staff }}</td><td>{{ dept() === null ? deptName(o) : svcName(o) }}</td><td>{{ o.cancelReason }}</td></tr>
+      } @empty { <tr><td colspan="6" class="empty">No cancellations in this period</td></tr> }
+    </table></div>
+  </section>
+
+</div>
